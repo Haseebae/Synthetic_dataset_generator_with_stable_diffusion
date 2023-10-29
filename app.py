@@ -1,15 +1,9 @@
-from compel import Compel, ReturnedEmbeddingsType
+from compel import Compel
 from diffusers import StableDiffusionPipeline, StableDiffusionImg2ImgPipeline
-from diffusers.utils import load_image
 import torch
 from PIL import Image
-from io import BytesIO
 import streamlit as st
 import numpy as np
-import http.client
-import json
-import base64
-import spacy
 
 
 runway = "runwayml/stable-diffusion-v1-5"
@@ -46,7 +40,7 @@ def text_to_img(generation_dict):
         runway, torch_dtype=torch.float16).to(DEVICE)
     sdxl_text.safety_checker = None
     sdxl_text.requires_safety_checker = False
-    sdxl_text.load_lora_weights('pytorch_lora_weights(1).safetensors')
+    sdxl_text.load_lora_weights('pytorch_lora_weights.safetensors')
 
     compel = Compel(tokenizer=sdxl_text.tokenizer,
                     text_encoder=sdxl_text.text_encoder)
