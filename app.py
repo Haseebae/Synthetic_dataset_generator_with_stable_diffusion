@@ -4,6 +4,18 @@ import torch
 from PIL import Image
 import streamlit as st
 import numpy as np
+import nltk
+from nltk.corpus import stopwords
+from nltk.tokenize import word_tokenize
+from nltk.tag import pos_tag
+import json
+import http
+import base64
+from io import BytesIO
+
+# nltk.download('punkt')
+# nltk.download('averaged_perceptron_tagger')
+# nltk.download('stopwords')
 
 
 runway = "runwayml/stable-diffusion-v1-5"
@@ -11,6 +23,11 @@ fast_sdxl = "prodia/sdxl-stable-diffusion-xl"
 
 DEVICE = "mps"
 FLAG = False
+
+
+def save_image(filename, image):
+    image.save(filename)
+    print("in save")
 
 
 def clean_slate():
@@ -29,7 +46,10 @@ def set_flag_false():
 
 
 def generate_prompt(generation_dict):
-    prompt = f'["{generation_dict["prompt"]} with these characteristics","{generation_dict["street"]["type"]}road", "{generation_dict["weather"]["type"]} weather","Indian {generation_dict["background"]["type"]}","{generation_dict["obstacles"]["type"]}","{generation_dict["congestion"]} traffic" ,"{generation_dict["time"]} time"].and(1,1,{generation_dict["street"]["intensity"]},{generation_dict["weather"]["intensity"]},{generation_dict["background"]["intensity"]},{generation_dict["obstacles"]["intensity"]},1,1)'
+    if generation_dict["prompt"]:
+        prompt = f'["{generation_dict["prompt"]} with these characteristics","{generation_dict["street"]["type"]}road", "{generation_dict["weather"]["type"]} weather","Indian {generation_dict["background"]["type"]}","{generation_dict["obstacles"]["type"]}","{generation_dict["congestion"]} traffic" ,"{generation_dict["time"]} time"].and(1,1,{generation_dict["street"]["intensity"]},{generation_dict["weather"]["intensity"]},{generation_dict["background"]["intensity"]},{generation_dict["obstacles"]["intensity"]},1,1)'
+    else:
+        prompt = f'["{generation_dict["street"]["type"]}road", "{generation_dict["weather"]["type"]} weather","Indian {generation_dict["background"]["type"]}","{generation_dict["obstacles"]["type"]}","{generation_dict["congestion"]} traffic" ,"{generation_dict["time"]} time"].and(1,{generation_dict["street"]["intensity"]},{generation_dict["weather"]["intensity"]},{generation_dict["background"]["intensity"]},{generation_dict["obstacles"]["intensity"]},1,1)'
     return prompt
 
 
@@ -51,7 +71,7 @@ def text_to_img(generation_dict):
 
     # generate image
     image = sdxl_text(prompt_embeds=conditioning, negative_prompt_embeds=negative_conditioning,
-                      num_inference_steps=1, output_type="pil").images[0]
+                      num_inference_steps=3, output_type="pil").images[0]
 
     return image
 
@@ -64,8 +84,50 @@ def img_to_img(generation_dict, image):
 
     init_image = image.resize((768, 512))
 
-    final_prompt = generate_prompt(generation_dict)
+    YOUR_GENERATED_SECRET = "xS3qCTxTtnuP9wViznTa:be115cea45bdb6edf8ea79dc67e77f4e255963185f0aeee316a5e79b6a45dcc4"
+    im_file = BytesIO()
+    image.save(im_file, format="JPEG")
+    im_bytes = im_file.getvalue()
+    encoded_image = base64.b64encode(im_bytes).decode("utf-8")
+    data = {
+        "data": [
+            {"image": f"data:image/jpeg;base64,{encoded_image}", "features": []},
+        ]
+    }
 
+    headers = {
+        "x-api-key": f"token {YOUR_GENERATED_SECRET}",
+        "content-type": "application/json",
+    }
+
+    connection = http.client.HTTPSConnection("api.scenex.jina.ai")
+    connection.request("POST", "/v1/describe", json.dumps(data), headers)
+    response = connection.getresponse()
+    response_data = response.read().decode("utf-8")
+
+    data = json.loads(response_data)
+    print(data)
+    text = data['result'][0]['text']
+    connection.close()
+    tokens = word_tokenize(text)
+    stop_words = set(stopwords.words('english'))
+
+    ignore_words = ["image", 'Image', 'game',
+                    'cartoon', 'sketch', 'Cartoon', 'Sketch']
+
+    tagged_tokens = pos_tag(tokens)
+
+    meaningful = [word for word, pos in tagged_tokens if pos == "NN" and word.lower(
+    ) not in ignore_words and word.lower() not in stop_words]
+
+    character = " ".join(meaningful[:15 if len(
+        meaningful) > 15 else len(meaningful)-1])
+
+    print(character)
+
+    # final_prompt = generate_prompt(generation_dict)
+    final_prompt = "Generate a new photorealistic image of an indian road with sharp defined edges, with these characteristics " + character + " " + \
+        f'{generation_dict["street"]["type"]}{generation_dict["street"]["intensity"]}road, {generation_dict["weather"]["type"]}{generation_dict["weather"]["intensity"]} weather,Indian {generation_dict["background"]["type"]}{generation_dict["background"]["intensity"]} background,{generation_dict["obstacles"]["type"]}{generation_dict["obstacles"]["intensity"]} obstacle,{generation_dict["congestion"]} ,{generation_dict["time"]} time'
     image = sdxl_image(prompt=final_prompt, negative_prompt="A game type scene, cartoon drawing, cartoon, game, satellite",
                        image=init_image,
                        strength=0.75, guidance_scale=7.5).images[0]
@@ -264,4 +326,15 @@ if __name__ == "__main__":
                 st.image(np.array(generated_image))
                 set_flag_false()
 
-    st.button("Reset", on_click=clean_slate)
+    columns = st.columns(2)
+    with columns[0]:
+        st.button("Reset", on_click=clean_slate)
+    if st.session_state.generated_image != None:
+        with columns[1]:
+
+            filename = st.text_input("Enter the filename: ")
+            image = st.session_state.generated_image
+            path = f"{filename}.jpg"
+            print(type(image))
+            save = st.button("Save", on_click=save_image,
+                             args=(path, image))
