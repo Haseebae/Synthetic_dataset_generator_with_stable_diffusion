@@ -71,7 +71,7 @@ def text_to_img(generation_dict):
 
     # generate image
     image = sdxl_text(prompt_embeds=conditioning, negative_prompt_embeds=negative_conditioning,
-                      num_inference_steps=3, output_type="pil").images[0]
+                      num_inference_steps=35, output_type="pil").images[0]
 
     return image
 
@@ -133,94 +133,6 @@ def img_to_img(generation_dict, image):
                        strength=0.75, guidance_scale=7.5).images[0]
 
     return image
-
-
-# def text_to_img(generation_dict):
-#     print(FLAG, "text model")
-
-#     sdxl_text = StableDiffusionPipeline.from_pretrained(
-#         runway, torch_dtype=torch.float16).to(DEVICE)
-#     sdxl_text.safety_checker = None
-#     sdxl_text.requires_safety_checker = False
-
-#     compel = Compel(tokenizer=sdxl_text.tokenizer,
-#                     text_encoder=sdxl_text.text_encoder)
-#     first_prompt = generation_dict["prompt"]
-#     final_prompt = generate_prompt(generation_dict)
-#     conditioning = compel(first_prompt)
-#     negative_prompt = "cartoon, satellite"
-#     negative_conditioning = compel(negative_prompt)
-
-#     # generate image
-#     image = sdxl_text(prompt_embeds=conditioning, negative_prompt_embeds=negative_conditioning,
-#                       num_inference_steps=1, output_type="pil").images[0]
-
-#     sdxl_image = StableDiffusionImg2ImgPipeline.from_pretrained(
-#         runway, torch_dtype=torch.float16).to(DEVICE)
-
-#     init_image = image.resize((768, 512))
-
-#     image = sdxl_image(prompt=final_prompt, image=init_image,
-#                        strength=0.75, guidance_scale=7.5).images[0]
-
-#     return image
-
-
-# def img_to_img(generation_dict, image):
-#     print(FLAG, "image model")
-#     YOUR_GENERATED_SECRET = "xS3qCTxTtnuP9wViznTa:be115cea45bdb6edf8ea79dc67e77f4e255963185f0aeee316a5e79b6a45dcc4"
-
-#     encoded_image = base64.b64encode(image).decode("utf-8")
-#     data = {
-#         "data": [
-#             {"image": f"data:image/jpeg;base64,{encoded_image}", "features": []},
-#         ]
-#     }
-
-#     headers = {
-#         "x-api-key": f"token {YOUR_GENERATED_SECRET}",
-#         "content-type": "application/json",
-#     }
-
-#     connection = http.client.HTTPSConnection("api.scenex.jina.ai")
-#     connection.request("POST", "/v1/describe", json.dumps(data), headers)
-#     response = connection.getresponse()
-#     response_data = response.read().decode("utf-8")
-#     data = json.loads(response_data)
-#     text = data['result'][0]['text']
-#     connection.close()
-#     # Load the English language model in spaCy
-#     nlp = spacy.load("en_core_web_sm")
-
-#     doc = nlp(text)
-#     # Define the words to ignore
-#     ignore_words = ["image", "Image", "cartoon", "sketch", "Cartoon", "Sketch"]
-
-#     # Extract meaningful nouns while ignoring specific words
-#     meaningful_nouns = [token.text for token in doc if token.pos_ ==
-#                         "NOUN" and token.text.lower() not in ignore_words and not token.is_stop]
-
-#     # Print the meaningful nouns
-#     character = " ".join(meaningful_nouns[:15])
-
-#     final_prompt = "Generate a new photorealistic image of an indian road with sharp defined edges, with these characteristics " + character + " " + \
-#         f'{generation_dict["street"]["type"]}{generation_dict["street"]["intensity"]}road, {generation_dict["weather"]["type"]}{generation_dict["weather"]["intensity"]} weather,Indian {generation_dict["background"]["type"]}{generation_dict["background"]["intensity"]} background,{generation_dict["obstacles"]["type"]}{generation_dict["obstacles"]["intensity"]} obstacle,{generation_dict["congestion"]} ,{generation_dict["time"]} time'
-
-#     sdxl_image = StableDiffusionImg2ImgPipeline.from_pretrained(
-#         runway, torch_dtype=torch.float16).to(DEVICE)
-
-#     init_image = image.resize((768, 512))
-
-#     image = sdxl_image(prompt=final_prompt, negative_prompt="A game type scene, cartoon drawing, cartoon, game, satellite",
-#                        image=init_image,
-#                        strength=0.75, guidance_scale=7.5).images[0]
-
-#     # refine_prompt = generate_prompt(generation_dict)
-
-#     # image = sdxl_image(prompt=refine_prompt, image=f_image,
-#     #                   strength=0.50, guidance_scale=7.5).images[0]
-
-#     return image
 
 
 if __name__ == "__main__":
